@@ -852,6 +852,7 @@ function App(){
   const [source,setSource] = useState("snapshot");
   const [profile,setProfile] = useState({});
   const [repos,setRepos] = useState([]);
+  const [hiddenRepos,setHiddenRepos] = useState(0);
   const [copied,setCopied] = useState(false);
   const [open,setOpen] = useState(false);
   const [flash,setFlash] = useState(0);
@@ -871,7 +872,10 @@ function App(){
     const ctl = new AbortController(), o = {signal:ctl.signal};
     fetch(`https://api.github.com/users/${C.username}`,o).then(r=>r.ok?r.json():Promise.reject()).then(setProfile).catch(()=>{});
     fetch(`https://api.github.com/users/${C.username}/repos?per_page=100&sort=pushed`,o).then(r=>r.ok?r.json():Promise.reject())
-      .then(l=>setRepos(l.filter(r=>!r.fork).slice(0,9))).catch(()=>{});
+      .then(l=>{ /* the portfolio site repo itself (<user>.github.io) is not listed as a project */
+        const own = r => /\.github\.io$/i.test(r.name);
+        setHiddenRepos(l.filter(r=>!r.fork&&own(r)).length);
+        setRepos(l.filter(r=>!r.fork&&!own(r)).slice(0,9)); }).catch(()=>{});
     fetch(`https://github-contributions-api.jogruber.de/v4/${C.username}?y=last`,o).then(r=>r.ok?r.json():Promise.reject())
       .then(j=>{ const c=j.contributions; if(Array.isArray(c)&&c.length>300){ setDays(c.map(d=>({date:d.date,count:d.count}))); setSource("live"); } }).catch(()=>{});
     return ()=>ctl.abort();
@@ -882,7 +886,7 @@ function App(){
   const bio = C.bio || profile.bio || "";
   const loc = C.location || profile.location || "";
   const followers = profile.followers ?? SNAP.followers;
-  const pubRepos = profile.public_repos ?? repos.length;
+  const pubRepos = Math.max(0,(profile.public_repos ?? repos.length) - hiddenRepos);
   const hasPublic = repos.length>0;
   const hasProjects = C.projects.length>0, hasSkills = C.skills.length>0;
 
